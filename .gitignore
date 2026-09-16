@@ -1,0 +1,57 @@
+# =========================
+# 1. FRONT-END (PNPM & Vite)
+# =========================
+node_modules/
+.pnpm-store/
+.pnpm-debug.log
+dist/
+dist-ssr/
+*.local
+
+# =========================
+# 2. BACK-END (Java / Maven / Gradle)
+# =========================
+target/
+build/
+.gradle/
+bin/
+*.class
+*.jar
+*.war
+
+# =========================
+# 3. AMBIENTE & VARIÁVEIS
+# =========================
+.env
+.env.*
+!.env.example
+*.pem
+
+# =========================
+# 4. LINT & CACHES
+# =========================
+.eslintcache
+.vite/
+.turbo/
+
+# =========================
+# 5. IDEs & EDITORES
+# =========================
+.idea/
+*.iml
+*.iws
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# =========================
+### 6. SISTEMA OPERACIONAL
+# =========================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
