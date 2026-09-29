@@ -6,7 +6,11 @@ node_modules/
 .pnpm-debug.log
 dist/
 dist-ssr/
+coverage/
 *.local
+*.timestamp-*.mjs
+*.tsbuildinfo
+.cache/
 
 # =========================
 # 2. BACK-END (Java / Maven / Gradle)
@@ -15,24 +19,66 @@ target/
 build/
 .gradle/
 bin/
+out/
 *.class
 *.jar
 *.war
+HELP.md
+
+# Nunca ignorar pastas de codigo-fonte que por acaso se chamem build/, bin/, target/ ou out/
+!**/src/main/**/build/
+!**/src/test/**/build/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+!**/src/main/**/target/
+!**/src/test/**/target/
+!**/src/main/**/out/
+!**/src/test/**/out/
 
 # =========================
-# 3. AMBIENTE & VARIÁVEIS
+# 3. AMBIENTE, SEGREDOS & DADOS
 # =========================
 .env
 .env.*
+*.env
 !.env.example
+
+# Chaves, certificados e keystores
 *.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+
+# Perfis do Spring com dados reais (a config versionada le tudo de variaveis de ambiente)
+application-local.*
+application-prod.*
+application-secret*.*
+
+# Dumps/backups de banco (migrations em db/migration/*.sql continuam versionadas)
+*.dump
+*.backup
+dump*.sql
+backup*.sql
 
 # =========================
-# 4. LINT & CACHES
+# 4. LINT, CACHES & LOGS
 # =========================
 .eslintcache
 .vite/
 .turbo/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+hs_err_pid*
+replay_pid*
 
 # =========================
 # 5. IDEs & EDITORES
@@ -40,18 +86,35 @@ bin/
 .idea/
 *.iml
 *.iws
+*.ipr
 .vscode/
 *.sublime-project
 *.sublime-workspace
 .project
 .classpath
 .settings/
+.factorypath
+.apt_generated/
+.springBeans
+.sts4-cache/
+.history/
+*.swp
+*.swo
+*~
 
 # =========================
-### 6. SISTEMA OPERACIONAL
+# 6. FERRAMENTAS
+# =========================
+.claude/worktrees/
+.claude/settings.local.json
+
+# =========================
+# 7. SISTEMA OPERACIONAL
 # =========================
 .DS_Store
 .DS_Store?
 ._*
 Thumbs.db
+ehthumbs.db
+$RECYCLE.BIN/
 Desktop.ini
