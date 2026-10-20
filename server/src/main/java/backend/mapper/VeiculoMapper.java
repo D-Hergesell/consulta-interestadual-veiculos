@@ -2,16 +2,13 @@ package backend.mapper;
 
 import backend.dto.MultaResponse;
 import backend.dto.OcorrenciaResponse;
-import backend.dto.ProprietarioResponse;
 import backend.dto.RestricaoResponse;
 import backend.dto.VeiculoResponse;
 import backend.entities.Estado;
 import backend.entities.Multa;
 import backend.entities.OcorrenciaFurtoRoubo;
-import backend.entities.Proprietario;
 import backend.entities.Restricao;
 import backend.entities.Veiculo;
-import backend.util.DocumentoUtils;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -31,16 +28,6 @@ public class VeiculoMapper {
                 .ufRegistro(uf(veiculo.getUfRegistro()))
                 .municipioRegistro(veiculo.getMunicipioRegistro())
                 .build();
-    }
-
-    public ProprietarioResponse toResponse(Proprietario proprietario) {
-        if (proprietario == null) {
-            return null;
-        }
-        return new ProprietarioResponse(
-                proprietario.getNome(),
-                DocumentoUtils.mascarar(proprietario.getCpfCnpj()),
-                proprietario.getTipoPessoa());
     }
 
     public OcorrenciaResponse toResponse(OcorrenciaFurtoRoubo ocorrencia) {

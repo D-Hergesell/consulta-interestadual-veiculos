@@ -29,7 +29,7 @@ public class Proprietario {
     @Column(name = "nome", nullable = false, length = 100)
     private String nome;
 
-    /** Pode vir com ou sem pontuacao. Nunca sai da API sem mascara (ver DocumentoUtils). */
+    /** Pode vir com ou sem pontuacao. Dado pessoal: nao deve ser exposto pela API publica. */
     @Column(name = "cpf_cnpj", nullable = false, unique = true, length = 18)
     private String cpfCnpj;
 

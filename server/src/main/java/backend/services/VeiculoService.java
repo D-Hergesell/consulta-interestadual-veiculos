@@ -59,7 +59,6 @@ public class VeiculoService {
                         .map(Multa::getValor)
                         .filter(Objects::nonNull)
                         .reduce(BigDecimal.ZERO, BigDecimal::add))
-                .proprietarioAtual(mapper.toResponse(veiculo.getProprietario()))
                 .build();
     }
 

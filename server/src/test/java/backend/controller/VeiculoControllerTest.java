@@ -2,6 +2,9 @@ package backend.controller;
 
 import backend.config.CorsConfig;
 import backend.config.SecurityConfig;
+import backend.dto.ConsultaPlacaResponse;
+import backend.dto.VeiculoResponse;
+import backend.enums.Situacao;
 import backend.exception.PlacaInvalidaException;
 import backend.exception.PlacaNaoEncontradaException;
 import backend.services.VeiculoService;
@@ -13,10 +16,16 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -46,6 +55,25 @@ class VeiculoControllerTest {
 
         mockMvc.perform(get("/api/veiculos/XYZ"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void consultaNaoExpoeDadosPessoaisDoProprietario() throws Exception {
+        when(veiculoService.consultarPorPlaca("ABC1234")).thenReturn(ConsultaPlacaResponse.builder()
+                .veiculo(VeiculoResponse.builder().placa("ABC1234").build())
+                .situacao(Situacao.REGULAR)
+                .ocorrenciasAtivas(List.of())
+                .restricoesAtivas(List.of())
+                .multasPendentes(List.of())
+                .totalMultasPendentes(BigDecimal.ZERO)
+                .build());
+
+        mockMvc.perform(get("/api/veiculos/ABC1234"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.veiculo.placa").value("ABC1234"))
+                .andExpect(jsonPath("$.proprietarioAtual").doesNotExist())
+                .andExpect(content().string(not(containsString("cpf"))))
+                .andExpect(content().string(not(containsString("documento"))));
     }
 
     @Test

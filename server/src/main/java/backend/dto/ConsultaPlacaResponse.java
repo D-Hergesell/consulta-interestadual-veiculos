@@ -11,6 +11,8 @@ import java.util.List;
  *
  * @param constaFurtoRoubo calculado a partir das ocorrencias ativas, e nao do campo situacao
  * @param multasPendentes  multas nao pagas ('Pendente' e 'Em recurso')
+ *
+ * Endpoint publico: nao inclui dados pessoais do proprietario (nome, CPF/CNPJ) por causa da LGPD.
  */
 @Builder
 public record ConsultaPlacaResponse(
@@ -20,7 +22,6 @@ public record ConsultaPlacaResponse(
         List<OcorrenciaResponse> ocorrenciasAtivas,
         List<RestricaoResponse> restricoesAtivas,
         List<MultaResponse> multasPendentes,
-        BigDecimal totalMultasPendentes,
-        ProprietarioResponse proprietarioAtual
+        BigDecimal totalMultasPendentes
 ) {
 }
