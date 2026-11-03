@@ -8,4 +8,6 @@ import java.util.List;
 public interface RestricaoRepository extends JpaRepository<Restricao, Integer> {
 
     List<Restricao> findByVeiculoIdAndAtivaTrueOrderByDataInclusaoDesc(Integer veiculoId);
+
+    boolean existsByVeiculoIdAndAtivaTrue(Integer veiculoId);
 }

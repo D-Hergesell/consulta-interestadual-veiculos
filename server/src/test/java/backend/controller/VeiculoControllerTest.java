@@ -16,14 +16,15 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -62,18 +63,58 @@ class VeiculoControllerTest {
         when(veiculoService.consultarPorPlaca("ABC1234")).thenReturn(ConsultaPlacaResponse.builder()
                 .veiculo(VeiculoResponse.builder().placa("ABC1234").build())
                 .situacao(Situacao.REGULAR)
-                .ocorrenciasAtivas(List.of())
-                .restricoesAtivas(List.of())
-                .multasPendentes(List.of())
-                .totalMultasPendentes(BigDecimal.ZERO)
+                .possuiRestricaoAtiva(true)
                 .build());
 
         mockMvc.perform(get("/api/veiculos/ABC1234"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.veiculo.placa").value("ABC1234"))
+                .andExpect(jsonPath("$.possuiRestricaoAtiva").value(true))
                 .andExpect(jsonPath("$.proprietarioAtual").doesNotExist())
                 .andExpect(content().string(not(containsString("cpf"))))
                 .andExpect(content().string(not(containsString("documento"))));
+    }
+
+    @Test
+    void consultaPublicaNaoExpoeMultasBoNemDescricaoDeRestricao() throws Exception {
+        when(veiculoService.consultarPorPlaca("ABC1234")).thenReturn(ConsultaPlacaResponse.builder()
+                .veiculo(VeiculoResponse.builder().placa("ABC1234").build())
+                .situacao(Situacao.REGULAR)
+                .build());
+
+        mockMvc.perform(get("/api/veiculos/ABC1234"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.multasPendentes").doesNotExist())
+                .andExpect(jsonPath("$.totalMultasPendentes").doesNotExist())
+                .andExpect(jsonPath("$.ocorrenciasAtivas").doesNotExist())
+                .andExpect(jsonPath("$.restricoesAtivas").doesNotExist())
+                .andExpect(content().string(not(containsString("boletim"))));
+    }
+
+    @Test
+    void renavamEhRepassadoPeloHeader() throws Exception {
+        when(veiculoService.listarMultas("ABC1234", "12345678901")).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/veiculos/ABC1234/multas").header(VeiculoController.HEADER_RENAVAM, "12345678901"))
+                .andExpect(status().isOk());
+        verify(veiculoService).listarMultas("ABC1234", "12345678901");
+    }
+
+    @Test
+    void renavamMuitoLongoRetorna400() throws Exception {
+        mockMvc.perform(get("/api/veiculos/ABC1234/detalhes")
+                        .header(VeiculoController.HEADER_RENAVAM, "1".repeat(21)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void preflightCorsLiberaHeaderDoRenavam() throws Exception {
+        mockMvc.perform(options("/api/veiculos/ABC1234/multas")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", VeiculoController.HEADER_RENAVAM))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("X-Renavam")));
     }
 
     @Test

@@ -1,5 +1,6 @@
 package backend.services;
 
+import backend.dto.ConsultaDetalhadaResponse;
 import backend.dto.ConsultaPlacaResponse;
 import backend.dto.MultaResponse;
 import backend.entities.Multa;
@@ -15,6 +16,7 @@ import backend.repository.OcorrenciaFurtoRouboRepository;
 import backend.repository.RestricaoRepository;
 import backend.repository.VeiculoRepository;
 import backend.util.PlacaUtils;
+import backend.util.RenavamUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,8 +38,30 @@ public class VeiculoService {
     private final MultaRepository multaRepository;
     private final VeiculoMapper mapper;
 
+    /** Consulta publica: so a placa basta, por isso nao devolve multas, BO nem descricao de restricoes. */
     public ConsultaPlacaResponse consultarPorPlaca(String placaInformada) {
         Veiculo veiculo = buscarVeiculo(placaInformada);
+        Integer id = veiculo.getId();
+
+        boolean constaFurtoRoubo = constaFurtoRoubo(
+                ocorrenciaRepository.findByVeiculoIdAndAtivoTrueOrderByDataOcorrenciaDesc(id));
+        registrarDivergencia(veiculo, constaFurtoRoubo);
+
+        return ConsultaPlacaResponse.builder()
+                .veiculo(mapper.toResponse(veiculo))
+                .situacao(veiculo.getSituacao())
+                .constaFurtoRoubo(constaFurtoRoubo)
+                .possuiRestricaoAtiva(restricaoRepository.existsByVeiculoIdAndAtivaTrue(id))
+                .build();
+    }
+
+    /**
+     * Consulta completa. Exige o RENAVAM do veiculo como prova de posse.
+     *
+     * @throws PlacaNaoEncontradaException se a placa nao existir ou o RENAVAM nao conferir (mesma resposta)
+     */
+    public ConsultaDetalhadaResponse consultarDetalhes(String placaInformada, String renavamInformado) {
+        Veiculo veiculo = buscarVeiculoComPosse(placaInformada, renavamInformado);
         Integer id = veiculo.getId();
 
         List<OcorrenciaFurtoRoubo> ocorrenciasAtivas =
@@ -47,7 +71,7 @@ public class VeiculoService {
         boolean constaFurtoRoubo = constaFurtoRoubo(ocorrenciasAtivas);
         registrarDivergencia(veiculo, constaFurtoRoubo);
 
-        return ConsultaPlacaResponse.builder()
+        return ConsultaDetalhadaResponse.builder()
                 .veiculo(mapper.toResponse(veiculo))
                 .situacao(veiculo.getSituacao())
                 .constaFurtoRoubo(constaFurtoRoubo)
@@ -62,8 +86,13 @@ public class VeiculoService {
                 .build();
     }
 
-    public List<MultaResponse> listarMultas(String placaInformada) {
-        Veiculo veiculo = buscarVeiculo(placaInformada);
+    /**
+     * Todas as multas do veiculo, inclusive pagas. Exige o RENAVAM como prova de posse.
+     *
+     * @throws PlacaNaoEncontradaException se a placa nao existir ou o RENAVAM nao conferir (mesma resposta)
+     */
+    public List<MultaResponse> listarMultas(String placaInformada, String renavamInformado) {
+        Veiculo veiculo = buscarVeiculoComPosse(placaInformada, renavamInformado);
         return multaRepository.findByVeiculoIdOrderByDataInfracaoDesc(veiculo.getId())
                 .stream().map(mapper::toResponse).toList();
     }
@@ -72,6 +101,18 @@ public class VeiculoService {
         String placa = PlacaUtils.normalizar(placaInformada);
         return veiculoRepository.findByPlaca(placa)
                 .orElseThrow(() -> new PlacaNaoEncontradaException(placa));
+    }
+
+    /**
+     * RENAVAM ausente ou errado gera a mesma excecao de placa inexistente, para a resposta nao revelar
+     * que a placa existe nem servir de oraculo para adivinhar o RENAVAM.
+     */
+    private Veiculo buscarVeiculoComPosse(String placaInformada, String renavamInformado) {
+        Veiculo veiculo = buscarVeiculo(placaInformada);
+        if (!RenavamUtils.confere(renavamInformado, veiculo.getRenavam())) {
+            throw new PlacaNaoEncontradaException(veiculo.getPlaca());
+        }
+        return veiculo;
     }
 
     /** Ocorrencia ativa de furto ou roubo. Recuperacao ativa nao conta. */

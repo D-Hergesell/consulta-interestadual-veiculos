@@ -24,12 +24,12 @@ consulta-interestadual-veiculos/
 │       │   │       │   ├── TransferenciaController.java
 │       │   │       │   └── VeiculoController.java
 │       │   │       ├── dto/
-│       │   │       │   ├── ConsultaPlacaResponse.java
+│       │   │       │   ├── ConsultaDetalhadaResponse.java   # com RENAVAM: ocorrências, restrições, multas
+│       │   │       │   ├── ConsultaPlacaResponse.java       # pública: veículo, situação, furto/roubo
 │       │   │       │   ├── EstadoResponse.java
 │       │   │       │   ├── InstrucaoTransferenciaResponse.java
 │       │   │       │   ├── MultaResponse.java
 │       │   │       │   ├── OcorrenciaResponse.java
-│       │   │       │   ├── ProprietarioResponse.java
 │       │   │       │   ├── RestricaoResponse.java
 │       │   │       │   ├── ServicoEstadoResponse.java
 │       │   │       │   ├── ServicoResponse.java
@@ -72,18 +72,23 @@ consulta-interestadual-veiculos/
 │       │   │       │   ├── TransferenciaService.java
 │       │   │       │   └── VeiculoService.java
 │       │   │       ├── util/
-│       │   │       │   ├── DocumentoUtils.java     # máscara de CPF/CNPJ
-│       │   │       │   └── PlacaUtils.java         # normalização/validação de placa (antiga e Mercosul)
+│       │   │       │   ├── PlacaUtils.java         # normalização/validação de placa (antiga e Mercosul)
+│       │   │       │   └── RenavamUtils.java       # conferência do RENAVAM (prova de posse)
 │       │   │       └── ConsultaInterestadualVeiculos.java
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       └── db/migration/               # scripts Flyway (vazio: banco imutável por enquanto)
 │       └── test/
 │           └── java/backend/
-│               ├── controller/VeiculoControllerTest.java
+│               ├── controller/
+│               │   ├── VeiculoControllerTest.java
+│               │   └── VeiculoProvaDePosseTest.java
+│               ├── security/
+│               │   ├── RateLimitFilterTest.java
+│               │   └── RateLimitSecurityChainTest.java
 │               └── util/
-│                   ├── DocumentoUtilsTest.java
-│                   └── PlacaUtilsTest.java
+│                   ├── PlacaUtilsTest.java
+│                   └── RenavamUtilsTest.java
 └── Estrutura_de_pastas.md
 ```
 
@@ -91,8 +96,9 @@ consulta-interestadual-veiculos/
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/api/veiculos/{placa}` | Consulta completa: veículo, situação, furto/roubo, restrições e multas pendentes, proprietário atual |
-| GET | `/api/veiculos/{placa}/multas` | Todas as multas do veículo |
+| GET | `/api/veiculos/{placa}` | Consulta pública: veículo, situação, `constaFurtoRoubo` e `possuiRestricaoAtiva` |
+| GET | `/api/veiculos/{placa}/detalhes` | Consulta completa (ocorrências com nº do BO, restrições e multas pendentes). Exige header `X-Renavam` |
+| GET | `/api/veiculos/{placa}/multas` | Todas as multas do veículo. Exige header `X-Renavam` |
 | GET | `/api/estados` | Lista de estados |
 | GET | `/api/estados/{uf}/servicos` | Serviços do estado (`tb_servicos_estado`) |
 | GET | `/api/servicos` | Catálogo de serviços |
@@ -111,6 +117,7 @@ consulta-interestadual-veiculos/
 - **Segurança:** a API é pública e somente leitura. Só `GET /api/**` é liberado e todo o resto é negado. Sem sessão (stateless), sem login padrão do Spring, CORS restrito às origens de `CORS_ALLOWED_ORIGINS` e headers de segurança ativos (HSTS, X-Frame-Options, nosniff, Referrer-Policy). Os erros não expõem stacktrace nem mensagens internas.
 - **N+1:** os relacionamentos são `LAZY` e carregados com `@EntityGraph`. `open-in-view` fica desligado.
 - **Placa:** normalizada (maiúscula, sem hífen) e validada nos formatos ABC1234 e ABC1D23.
-- **Dados pessoais:** CPF/CNPJ sempre mascarado no DTO (`***.456.789-**`).
+- **Dados pessoais:** nenhum dado do proprietário (nome, CPF/CNPJ) sai pela API. Renavam e chassi também não aparecem nas respostas.
+- **Prova de posse:** multas, nº do BO e descrição de restrições só saem com placa + RENAVAM, enviado no header `X-Renavam` (fora da URL, para não ir para logs). RENAVAM ausente ou errado devolve o mesmo 404 de placa inexistente, para não revelar se a placa existe.
 - **Multas pendentes:** tudo que não está `Pago`, ou seja, `Pendente`, `Em recurso` e status nulo.
 - **Furto/roubo:** `constaFurtoRoubo` é calculado a partir das ocorrências ativas, e não do campo `situacao`. Divergências entre os dois são logadas.

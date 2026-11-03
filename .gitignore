@@ -105,8 +105,18 @@ replay_pid*
 # =========================
 # 6. FERRAMENTAS
 # =========================
-.claude/worktrees/
-.claude/settings.local.json
+# Configuracao local do Claude Code (skills, worktrees, settings) e lock das skills
+.claude/
+skills-lock.json
+
+# Ambientes Python locais (ex.: gerador do relatorio de auditoria)
+.venv/
+venv/
+__pycache__/
+
+# Auditoria de seguranca: relatorio, issues e gerador ficam so na maquina local
+# (detalham vulnerabilidades ainda abertas e nao devem ir para o repositorio publico)
+docs/security-audit/
 
 # =========================
 # 7. SISTEMA OPERACIONAL

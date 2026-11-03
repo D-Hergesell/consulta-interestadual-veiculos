@@ -22,7 +22,8 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(origensPermitidas);
         config.setAllowedMethods(List.of("GET", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Content-Type", "Accept"));
+        // X-Renavam: prova de posse exigida em /api/veiculos/{placa}/detalhes e /multas
+        config.setAllowedHeaders(List.of("Content-Type", "Accept", "X-Renavam"));
         config.setAllowCredentials(false);
         config.setMaxAge(Duration.ofHours(1));
 
