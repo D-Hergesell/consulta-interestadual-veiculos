@@ -16,6 +16,13 @@ updates:
       spring:
         patterns:
           - "org.springframework*"
+    # Salto de versao principal (ex.: Spring Boot 3 -> 4, springdoc 2 -> 3) exige migracao e fica
+    # para uma tarefa propria. Versoes menores e correcoes (ex.: 3.5.16 -> 3.5.17) continuam chegando.
+    ignore:
+      - dependency-name: "org.springframework*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "org.springdoc*"
+        update-types: ["version-update:semver-major"]
 
   # Versoes das actions usadas nos workflows (.github/workflows/)
   - package-ecosystem: github-actions

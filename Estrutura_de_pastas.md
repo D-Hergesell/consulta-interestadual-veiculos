@@ -129,7 +129,7 @@ consulta-interestadual-veiculos/
 ## Integração contínua
 
 - **Backend CI** (`.github/workflows/backend-ci.yml`): a cada push na `main` e em todo pull request que mexa em `server/`, o GitHub instala o Java 21 e roda `./mvnw test`. O resultado aparece como ✅/❌ no commit e no PR; se falhar, os relatórios dos testes ficam disponíveis por 7 dias na aba **Actions** (artefato `relatorios-surefire`). Também dá para rodar manualmente pela aba Actions.
-- **Dependabot** (`.github/dependabot.yml`): toda segunda-feira abre PRs atualizando as dependências Maven (Spring agrupado num PR só) e as versões das actions. Cada PR passa pela CI antes do merge.
+- **Dependabot** (`.github/dependabot.yml`): toda segunda-feira abre PRs atualizando as dependências Maven (Spring agrupado num PR só) e as versões das actions. Cada PR passa pela CI antes do merge. Saltos de versão principal do Spring Boot e do springdoc (ex.: 3 → 4) são ignorados de propósito: exigem migração e ficam para uma tarefa própria.
 
 ## Decisões
 
