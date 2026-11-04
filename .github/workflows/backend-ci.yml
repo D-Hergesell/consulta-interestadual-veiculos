@@ -1,0 +1,58 @@
+# Roda os testes do backend (server/) a cada push na main e em todo pull request.
+# Os testes nao acessam o banco: nao precisa de segredo nem de .env.
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "server/**"
+      - ".github/workflows/backend-ci.yml"
+  # Permite rodar na mao pela aba Actions
+  workflow_dispatch:
+
+# So leitura do codigo: o workflow nao precisa escrever nada no repositorio
+permissions:
+  contents: read
+
+# Um push novo na mesma branch cancela a execucao anterior que ainda estiver rodando
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Testes (Java 21)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar o Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: server/pom.xml
+
+      - name: Rodar os testes
+        run: ./mvnw -B -ntp test
+
+      # Em caso de falha, guarda os relatorios do Surefire para ver qual teste quebrou
+      - name: Publicar relatorios dos testes
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-surefire
+          path: server/target/surefire-reports/
+          retention-days: 7

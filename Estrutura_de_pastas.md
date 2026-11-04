@@ -4,6 +4,9 @@ Backend: Spring Boot 3.5 (Java 21) + Spring Data JPA + PostgreSQL (Neon) + Sprin
 
 ```text
 consulta-interestadual-veiculos/
+├── .github/
+│   ├── dependabot.yml                          # PRs semanais de atualização (Maven e actions)
+│   └── workflows/backend-ci.yml                # roda os testes do backend a cada push/PR
 ├── client/
 ├── server/
 │   ├── .mvn/wrapper/maven-wrapper.properties
@@ -121,6 +124,12 @@ consulta-interestadual-veiculos/
 1. Copie `server/.env.example` para `server/.env` e preencha `DB_URL` (com `?sslmode=require`), `DB_USERNAME` e `DB_PASSWORD`. Todas as outras configurações do `application.properties` também vêm de variáveis de ambiente e já têm padrão seguro; a lista completa está no `.env.example`.
 2. Dentro de `server/`: `./mvnw spring-boot:run` (Windows: `mvnw.cmd spring-boot:run`).
 3. Com `SWAGGER_ENABLED=true`, a documentação fica em `http://localhost:8080/swagger-ui.html`.
+4. Testes: dentro de `server/`, `./mvnw test` (não precisam do `.env` nem acessam o banco). Precisa do JDK 21.
+
+## Integração contínua
+
+- **Backend CI** (`.github/workflows/backend-ci.yml`): a cada push na `main` e em todo pull request que mexa em `server/`, o GitHub instala o Java 21 e roda `./mvnw test`. O resultado aparece como ✅/❌ no commit e no PR; se falhar, os relatórios dos testes ficam disponíveis por 7 dias na aba **Actions** (artefato `relatorios-surefire`). Também dá para rodar manualmente pela aba Actions.
+- **Dependabot** (`.github/dependabot.yml`): toda segunda-feira abre PRs atualizando as dependências Maven (Spring agrupado num PR só) e as versões das actions. Cada PR passa pela CI antes do merge.
 
 ## Decisões
 
