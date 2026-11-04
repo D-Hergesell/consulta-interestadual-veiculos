@@ -17,16 +17,30 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.web.filter.CorsFilter;
 
 import java.time.Clock;
+import java.util.List;
 
 /**
- * API publica e somente leitura: libera apenas GET em /api/** (e a documentacao) e nega todo o resto.
+ * API publica e somente leitura: libera GET so nas rotas listadas em ROTAS_PUBLICAS (e a documentacao)
+ * e nega todo o resto. Rota nova nasce bloqueada (403) ate entrar na lista; o SecurityRotasPublicasTest
+ * falha se existir handler fora dela, para a decisao ser sempre explicita.
  * Quando houver endpoints de escrita/admin, adicionar autenticacao (ex.: JWT) antes de libera-los aqui.
- * Como nao ha login, o rate limit por IP (RateLimitFilter) e a protecao contra abuso e enumeracao de placas.
+ * Como nao ha login, o rate limit (RateLimitFilter) e a protecao contra abuso e enumeracao de placas.
  */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(RateLimitProperties.class)
 public class SecurityConfig {
+
+    /** Rotas GET publicas. "*" = um segmento de path (placa ou UF). Lista imutavel. */
+    public static final List<String> ROTAS_PUBLICAS = List.of(
+            "/api/estados",
+            "/api/estados/*/servicos",
+            "/api/servicos",
+            "/api/transferencias",
+            "/api/veiculos/*",
+            "/api/veiculos/*/detalhes",
+            "/api/veiculos/*/multas"
+    );
 
     private static final String[] DOCUMENTACAO = {"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"};
 
@@ -49,7 +63,7 @@ public class SecurityConfig {
                         .referrerPolicy(ref -> ref.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                         .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000)))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, ROTAS_PUBLICAS.toArray(String[]::new)).permitAll()
                         .requestMatchers(HttpMethod.GET, DOCUMENTACAO).permitAll()
                         // Pagina de erro interna do Spring: sem isso, erros viram 401/403 em vez do status real
                         .requestMatchers("/error").permitAll()
