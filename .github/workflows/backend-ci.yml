@@ -51,7 +51,7 @@ jobs:
       # Em caso de falha, guarda os relatorios do Surefire para ver qual teste quebrou
       - name: Publicar relatorios dos testes
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: relatorios-surefire
           path: server/target/surefire-reports/
