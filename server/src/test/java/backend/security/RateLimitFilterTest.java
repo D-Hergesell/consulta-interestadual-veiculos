@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RateLimitFilterTest {
 
     private static final int LIMITE = 2;
+    private static final int LIMITE_PLACA = 1;
 
     private final ObjectMapper objectMapper = Jackson2ObjectMapperBuilder.json().build();
     // Comeca 30s depois do inicio de um minuto, para o Retry-After ser previsivel
@@ -64,6 +65,43 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void ipv6DoMesmoPrefixo64CompartilhaOContador() throws Exception {
+        RateLimitFilter filtro = filtro(true);
+        executar(filtro, "/api/estados", "2001:db8:1:2::1");
+        executar(filtro, "/api/estados", "2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+
+        assertThat(executar(filtro, "/api/estados", "2001:db8:1:2:ffff::9").getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    void ipv6DePrefixos64DiferentesContaSeparado() throws Exception {
+        RateLimitFilter filtro = filtro(true);
+        executar(filtro, "/api/estados", "2001:db8:1:2::1");
+        executar(filtro, "/api/estados", "2001:db8:1:2::2");
+
+        assertThat(executar(filtro, "/api/estados", "2001:db8:1:3::1").getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void chaveDoCliente() {
+        assertThat(RateLimitFilter.chaveDoCliente("10.0.0.1")).isEqualTo("10.0.0.1");
+        assertThat(RateLimitFilter.chaveDoCliente("2001:DB8:0:2:1:2:3:4")).isEqualTo("2001:db8:0:2::/64");
+        assertThat(RateLimitFilter.chaveDoCliente("fe80::1%eth0")).isEqualTo("fe80:0:0:0::/64");
+        assertThat(RateLimitFilter.chaveDoCliente("::ffff:10.0.0.1")).isEqualTo("10.0.0.1");
+    }
+
+    @Test
+    void rotasDePlacaTemLimiteProprio() throws Exception {
+        RateLimitFilter filtro = filtro(true);
+        assertThat(executar(filtro, "/api/veiculos/ABC1234", "10.0.0.1").getStatus()).isEqualTo(200);
+
+        assertThat(executar(filtro, "/api/veiculos/ABC1235", "10.0.0.1").getStatus()).isEqualTo(429);
+        // O restante da API continua com o contador e o limite gerais
+        assertThat(executar(filtro, "/api/estados", "10.0.0.1").getStatus()).isEqualTo(200);
+        assertThat(executar(filtro, "/api/estados", "10.0.0.1").getStatus()).isEqualTo(200);
+    }
+
+    @Test
     void liberaNovamenteQuandoAJanelaVira() throws Exception {
         RateLimitFilter filtro = filtro(true);
         executar(filtro, "/api/estados", "10.0.0.1");
@@ -92,7 +130,7 @@ class RateLimitFilterTest {
     }
 
     private RateLimitFilter filtro(boolean habilitado) {
-        return new RateLimitFilter(new RateLimitProperties(habilitado, LIMITE), objectMapper, relogio);
+        return new RateLimitFilter(new RateLimitProperties(habilitado, LIMITE, LIMITE_PLACA), objectMapper, relogio);
     }
 
     private static MockHttpServletResponse executar(RateLimitFilter filtro, String uri, String ip) throws Exception {

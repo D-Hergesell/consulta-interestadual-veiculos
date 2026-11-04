@@ -13,7 +13,10 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,11 +26,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Limita requisicoes em /api/** por IP, em janelas fixas de 1 minuto. Acima do limite responde
+ * Limita requisicoes em /api/** por cliente, em janelas fixas de 1 minuto. Acima do limite responde
  * 429 (ProblemDetail) com Retry-After.
  * <p>
+ * Cliente = IPv4 exato ou o prefixo /64 do IPv6 (um provedor entrega um /64 inteiro para cada
+ * assinante, entao contar por endereco IPv6 exato deixaria o atacante trocar de IP a vontade).
+ * As rotas de placa (/api/veiculos/**) tem contador e limite proprios, menores que o do restante da API.
+ * <p>
  * Os contadores ficam em memoria e a cada janela nova o mapa inteiro e descartado, entao a memoria
- * fica limitada aos IPs vistos no ultimo minuto. Vale por instancia: com varias replicas o limite
+ * fica limitada aos clientes vistos no ultimo minuto. Vale por instancia: com varias replicas o limite
  * efetivo e multiplicado pelo numero de replicas.
  */
 @Slf4j
@@ -35,6 +42,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final long JANELA_MS = Duration.ofMinutes(1).toMillis();
     private static final String PREFIXO_API = "/api/";
+    private static final String PREFIXO_PLACA = "/api/veiculos/";
 
     private final RateLimitProperties properties;
     private final ObjectMapper objectMapper;
@@ -50,8 +58,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String caminho = request.getRequestURI().substring(request.getContextPath().length());
-        return !properties.enabled() || !caminho.startsWith(PREFIXO_API);
+        return !properties.enabled() || !caminho(request).startsWith(PREFIXO_API);
     }
 
     @Override
@@ -59,18 +66,55 @@ public class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         long agora = clock.millis();
         Janela janela = janelaDe(agora);
-        String ip = request.getRemoteAddr();
-        int total = janela.contadores().computeIfAbsent(ip, chave -> new AtomicInteger()).incrementAndGet();
 
-        if (total <= properties.requestsPerMinute()) {
+        boolean rotaDePlaca = caminho(request).startsWith(PREFIXO_PLACA);
+        int limite = rotaDePlaca ? properties.placaRequestsPerMinute() : properties.requestsPerMinute();
+        String cliente = chaveDoCliente(request.getRemoteAddr());
+        String chave = (rotaDePlaca ? "placa|" : "api|") + cliente;
+        int total = janela.contadores().computeIfAbsent(chave, c -> new AtomicInteger()).incrementAndGet();
+
+        if (total <= limite) {
             chain.doFilter(request, response);
             return;
         }
-        // Loga so a primeira rejeicao de cada IP na janela, para nao inundar o log durante um abuso
-        if (total == properties.requestsPerMinute() + 1) {
-            log.warn("Limite de {} requisições/min excedido pelo IP {}", properties.requestsPerMinute(), ip);
+        // Loga so a primeira rejeicao de cada cliente na janela, para nao inundar o log durante um abuso
+        if (total == limite + 1) {
+            log.warn("Limite de {} requisições/min ({}) excedido por {}", limite,
+                    rotaDePlaca ? "placa" : "api", cliente);
         }
         rejeitar(request, response, segundosAteProximaJanela(janela, agora));
+    }
+
+    private static String caminho(HttpServletRequest request) {
+        return request.getRequestURI().substring(request.getContextPath().length());
+    }
+
+    /**
+     * IPv4 fica como esta; IPv6 vira o prefixo /64 (ex.: 2001:db8:1:2::/64).
+     * IPv4 mapeado em IPv6 (::ffff:10.0.0.1) volta para a forma IPv4.
+     */
+    static String chaveDoCliente(String ip) {
+        if (ip == null || ip.indexOf(':') < 0) {
+            return ip;
+        }
+        // Remove o escopo de link-local (fe80::1%eth0) antes de converter
+        int escopo = ip.indexOf('%');
+        String literal = escopo < 0 ? ip : ip.substring(0, escopo);
+        try {
+            // Com literal IP o getByName so valida o formato, sem consulta DNS
+            InetAddress endereco = InetAddress.getByName(literal);
+            if (endereco instanceof Inet6Address) {
+                byte[] bytes = endereco.getAddress();
+                StringBuilder prefixo = new StringBuilder();
+                for (int i = 0; i < 8; i += 2) {
+                    prefixo.append(Integer.toHexString(((bytes[i] & 0xff) << 8) | (bytes[i + 1] & 0xff))).append(':');
+                }
+                return prefixo.append(":/64").toString();
+            }
+            return endereco.getHostAddress();
+        } catch (UnknownHostException e) {
+            return ip;
+        }
     }
 
     /** Devolve a janela do instante informado, trocando a atual quando o minuto virou. */

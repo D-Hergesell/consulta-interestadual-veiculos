@@ -29,7 +29,7 @@ public class Restricao {
     @JoinColumn(name = "veiculo_id")
     private Veiculo veiculo;
 
-    /** 'Alienacao Fiduciaria', 'Judicial', 'Administrativa', 'Tributaria'. */
+    /** Valores no banco: 'Alienacao Fiduciaria', 'Judicial', 'Administrativa', 'Tributaria' (gravados com acento). */
     @Column(name = "tipo_restricao", nullable = false, length = 40)
     private String tipoRestricao;
 

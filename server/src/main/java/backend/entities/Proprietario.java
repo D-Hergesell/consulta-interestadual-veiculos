@@ -29,7 +29,10 @@ public class Proprietario {
     @Column(name = "nome", nullable = false, length = 100)
     private String nome;
 
-    /** Pode vir com ou sem pontuacao. Dado pessoal: nao deve ser exposto pela API publica. */
+    /**
+     * Sempre formatado no banco: CPF 000.000.000-00 (14 caracteres) ou CNPJ 00.000.000/0000-00 (18).
+     * Dado pessoal: nao deve ser exposto pela API publica.
+     */
     @Column(name = "cpf_cnpj", nullable = false, unique = true, length = 18)
     private String cpfCnpj;
 

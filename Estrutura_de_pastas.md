@@ -30,6 +30,7 @@ consulta-interestadual-veiculos/
 │       │   │       │   ├── InstrucaoTransferenciaResponse.java
 │       │   │       │   ├── MultaResponse.java
 │       │   │       │   ├── OcorrenciaResponse.java
+│       │   │       │   ├── RegraEspecialResponse.java
 │       │   │       │   ├── RestricaoResponse.java
 │       │   │       │   ├── ServicoEstadoResponse.java
 │       │   │       │   ├── ServicoResponse.java
@@ -42,7 +43,9 @@ consulta-interestadual-veiculos/
 │       │   │       │   ├── InstrucaoTransferencia.java
 │       │   │       │   ├── Multa.java
 │       │   │       │   ├── OcorrenciaFurtoRoubo.java
+│       │   │       │   ├── ProcedimentoPadraoTransferencia.java   # fallback de transferência
 │       │   │       │   ├── Proprietario.java
+│       │   │       │   ├── RegraEspecialEstado.java   # regras de transferência por UF
 │       │   │       │   ├── Restricao.java
 │       │   │       │   ├── Servico.java
 │       │   │       │   ├── ServicoEstado.java
@@ -52,10 +55,12 @@ consulta-interestadual-veiculos/
 │       │   │       │   ├── Situacao.java
 │       │   │       │   ├── StatusPagamento.java
 │       │   │       │   ├── TipoOcorrencia.java
-│       │   │       │   └── TipoPessoa.java
+│       │   │       │   ├── TipoPessoa.java
+│       │   │       │   └── TipoRegra.java
 │       │   │       ├── exception/
 │       │   │       │   ├── ApiException.java
 │       │   │       │   ├── EstadoNaoEncontradoException.java
+│       │   │       │   ├── OrigemDestinoIguaisException.java
 │       │   │       │   ├── GlobalExceptionHandler.java     # @RestControllerAdvice (ProblemDetail / RFC 7807)
 │       │   │       │   ├── PlacaInvalidaException.java
 │       │   │       │   ├── PlacaNaoEncontradaException.java
@@ -81,11 +86,14 @@ consulta-interestadual-veiculos/
 │       └── test/
 │           └── java/backend/
 │               ├── controller/
+│               │   ├── TransferenciaControllerTest.java
 │               │   ├── VeiculoControllerTest.java
 │               │   └── VeiculoProvaDePosseTest.java
+│               ├── entities/converter/TipoRegraConverterTest.java
 │               ├── security/
 │               │   ├── RateLimitFilterTest.java
 │               │   └── RateLimitSecurityChainTest.java
+│               ├── services/TransferenciaServiceTest.java
 │               └── util/
 │                   ├── PlacaUtilsTest.java
 │                   └── RenavamUtilsTest.java
@@ -102,7 +110,7 @@ consulta-interestadual-veiculos/
 | GET | `/api/estados` | Lista de estados |
 | GET | `/api/estados/{uf}/servicos` | Serviços do estado (`tb_servicos_estado`) |
 | GET | `/api/servicos` | Catálogo de serviços |
-| GET | `/api/transferencias?origem=SC&destino=SP` | Passo a passo, taxa, prazo e documentos |
+| GET | `/api/transferencias?origem=SC&destino=SP` | Passo a passo, taxa, prazo e documentos. Sem instrução específica para o par, devolve o procedimento padrão nacional (`procedimentoPadrao: true`) com as regras especiais ativas do estado de destino. Origem igual ao destino: `400` |
 
 ## Como rodar
 
@@ -115,6 +123,8 @@ consulta-interestadual-veiculos/
 - **Banco imutável:** `spring.jpa.hibernate.ddl-auto=validate`, e as entidades são `@Immutable`. O Hibernate só confere o mapeamento e nunca altera o schema nem grava dados. O Flyway fica desligado (`FLYWAY_ENABLED=false`).
 - **Credenciais:** ficam só em variáveis de ambiente ou em `server/.env`, que é ignorado pelo git.
 - **Segurança:** a API é pública e somente leitura. Só `GET /api/**` é liberado e todo o resto é negado. Sem sessão (stateless), sem login padrão do Spring, CORS restrito às origens de `CORS_ALLOWED_ORIGINS` e headers de segurança ativos (HSTS, X-Frame-Options, nosniff, Referrer-Policy). Os erros não expõem stacktrace nem mensagens internas.
+- **Rate limit:** janela fixa de 1 minuto por cliente, contado como IPv4 exato ou prefixo `/64` do IPv6 (um provedor entrega um /64 inteiro por assinante). `/api/veiculos/**` tem contador próprio (`RATE_LIMIT_PLACA_REQUESTS_PER_MINUTE`, padrão 20) e o restante de `/api/**` usa `RATE_LIMIT_REQUESTS_PER_MINUTE` (padrão 60). Acima do limite: `429` com `Retry-After`. Os contadores ficam em memória **por instância**: com N réplicas o limite efetivo é N vezes maior (para limite global seria preciso um contador compartilhado, ex.: Bucket4j + Redis).
+- **Deploy atrás de proxy:** com `FORWARD_HEADERS_STRATEGY=none` (padrão) o IP vem da conexão, então atrás de um proxy/load balancer todos os clientes dividiriam o IP do proxy e o mesmo limite. Nesse caso use `native` ou `framework`, **mas só** se o proxy sobrescrever o `X-Forwarded-For` recebido do cliente; caso contrário o cliente forja o header e escapa do limite.
 - **N+1:** os relacionamentos são `LAZY` e carregados com `@EntityGraph`. `open-in-view` fica desligado.
 - **Placa:** normalizada (maiúscula, sem hífen) e validada nos formatos ABC1234 e ABC1D23.
 - **Dados pessoais:** nenhum dado do proprietário (nome, CPF/CNPJ) sai pela API. Renavam e chassi também não aparecem nas respostas.

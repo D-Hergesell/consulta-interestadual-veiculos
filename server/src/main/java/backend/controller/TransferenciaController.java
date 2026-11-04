@@ -19,7 +19,9 @@ public class TransferenciaController {
 
     private final TransferenciaService transferenciaService;
 
-    @Operation(summary = "Passo a passo, taxa, prazo e documentos para transferir o veículo entre estados")
+    @Operation(summary = "Passo a passo, taxa, prazo e documentos para transferir o veículo entre estados",
+            description = "Sem instrução específica para o par, devolve o procedimento padrão nacional "
+                    + "(procedimentoPadrao=true) com as regras especiais ativas do estado de destino.")
     @GetMapping
     public InstrucaoTransferenciaResponse buscar(
             @RequestParam @Pattern(regexp = "[A-Za-z]{2}") String origem,

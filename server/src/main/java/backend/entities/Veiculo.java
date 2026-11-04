@@ -54,14 +54,14 @@ public class Veiculo {
     @Column(name = "cor", nullable = false, length = 20)
     private String cor;
 
-    /** Automovel, Motocicleta, Caminhao etc. */
+    /** Valores no banco: Automovel, Caminhonete, Caminhao, Motocicleta, Utilitario (gravados com acento). */
     @Column(name = "tipo_veiculo", length = 30)
     private String tipoVeiculo;
 
     @Column(name = "combustivel", length = 30)
     private String combustivel;
 
-    /** Particular, Aluguel, Oficial, Aprendizagem. */
+    /** Valores no banco: Particular, Aluguel. Padrao da coluna: 'Particular'. */
     @Column(name = "categoria", length = 30)
     private String categoria;
 

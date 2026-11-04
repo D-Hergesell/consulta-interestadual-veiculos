@@ -27,7 +27,7 @@ public class Servico {
     @JoinColumn(name = "categoria_id")
     private CategoriaServico categoria;
 
-    @Column(name = "nome", nullable = false, length = 100)
+    @Column(name = "nome", nullable = false, unique = true, length = 100)
     private String nome;
 
     @Column(name = "descricao", columnDefinition = "text")

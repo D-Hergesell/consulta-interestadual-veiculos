@@ -20,7 +20,7 @@ public class CategoriaServico {
     @Column(name = "id")
     private Integer id;
 
-    /** 'Veiculos', 'CNH', 'Infracoes', 'Furto/Roubo'. */
+    /** Valores no banco: 'Veiculos', 'Infracoes', 'Furto/Roubo' (gravados com acento). */
     @Column(name = "nome", nullable = false, unique = true, length = 50)
     private String nome;
 }
