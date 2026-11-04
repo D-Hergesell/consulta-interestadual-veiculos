@@ -4,6 +4,7 @@ import backend.dto.ServicoEstadoResponse;
 import backend.dto.ServicoResponse;
 import backend.entities.Servico;
 import backend.entities.ServicoEstado;
+import backend.util.UrlUtils;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -24,7 +25,7 @@ public class ServicoMapper {
                 .uf(servicoEstado.getEstado().getUf())
                 .taxaEstimada(servicoEstado.getTaxaEstimada())
                 .prazoDias(servicoEstado.getPrazoDias())
-                .urlServico(servicoEstado.getUrlServico())
+                .urlServico(UrlUtils.httpOuNula(servicoEstado.getUrlServico()))
                 .observacoes(servicoEstado.getObservacoes())
                 .build();
     }

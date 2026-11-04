@@ -2,6 +2,7 @@ package backend.mapper;
 
 import backend.dto.EstadoResponse;
 import backend.entities.Estado;
+import backend.util.UrlUtils;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,7 +13,7 @@ public class EstadoMapper {
                 estado.getUf(),
                 estado.getNome(),
                 estado.getSiglaOrgao(),
-                estado.getUrlDetran(),
+                UrlUtils.httpOuNula(estado.getUrlDetran()),
                 estado.getTelefone(),
                 estado.getWhatsapp());
     }

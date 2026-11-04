@@ -6,7 +6,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Resposta de GET /api/transferencias.
+ * Resposta de GET /api/transferencias. passoAPasso, documentosNecessarios e observacaoLegal sao texto puro
+ * (com quebras de linha): o front deve exibir como texto, nunca interpretar como HTML.
  *
  * @param procedimentoPadrao     false: instrucao especifica do par origem/destino (tb_instrucoes_transferencia);
  *                               true: nao ha instrucao especifica e vale o procedimento padrao nacional

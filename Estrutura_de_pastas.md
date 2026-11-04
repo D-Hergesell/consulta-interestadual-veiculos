@@ -78,25 +78,29 @@ consulta-interestadual-veiculos/
 │       │   │       │   └── VeiculoService.java
 │       │   │       ├── util/
 │       │   │       │   ├── PlacaUtils.java         # normalização/validação de placa (antiga e Mercosul)
-│       │   │       │   └── RenavamUtils.java       # conferência do RENAVAM (prova de posse)
+│       │   │       │   ├── RenavamUtils.java       # conferência do RENAVAM (prova de posse)
+│       │   │       │   └── UrlUtils.java           # só deixa sair URL http/https
 │       │   │       └── ConsultaInterestadualVeiculos.java
 │       │   └── resources/
 │       │       ├── application.properties
 │       │       └── db/migration/               # scripts Flyway (vazio: banco imutável por enquanto)
 │       └── test/
 │           └── java/backend/
+│               ├── config/SecurityRotasPublicasTest.java   # trava rota sem decisão em ROTAS_PUBLICAS
 │               ├── controller/
 │               │   ├── TransferenciaControllerTest.java
 │               │   ├── VeiculoControllerTest.java
 │               │   └── VeiculoProvaDePosseTest.java
 │               ├── entities/converter/TipoRegraConverterTest.java
+│               ├── mapper/UrlNosMappersTest.java
 │               ├── security/
 │               │   ├── RateLimitFilterTest.java
 │               │   └── RateLimitSecurityChainTest.java
 │               ├── services/TransferenciaServiceTest.java
 │               └── util/
 │                   ├── PlacaUtilsTest.java
-│                   └── RenavamUtilsTest.java
+│                   ├── RenavamUtilsTest.java
+│                   └── UrlUtilsTest.java
 └── Estrutura_de_pastas.md
 ```
 
@@ -125,6 +129,7 @@ consulta-interestadual-veiculos/
 - **Segurança:** a API é pública e somente leitura. Só são liberadas as rotas GET listadas em `SecurityConfig.ROTAS_PUBLICAS`; todo o resto é negado (`403`), inclusive GET em rota que não está na lista. Endpoint novo precisa entrar na lista de propósito: o `SecurityRotasPublicasTest` falha se existir handler sem essa decisão (ou entrada na lista sem handler). Sem sessão (stateless), sem login padrão do Spring, CORS restrito às origens de `CORS_ALLOWED_ORIGINS` e headers de segurança ativos (HSTS, X-Frame-Options, nosniff, Referrer-Policy). Os erros não expõem stacktrace nem mensagens internas.
 - **Rate limit:** janela fixa de 1 minuto por cliente, contado como IPv4 exato ou prefixo `/64` do IPv6 (um provedor entrega um /64 inteiro por assinante). `/api/veiculos/**` tem contador próprio (`RATE_LIMIT_PLACA_REQUESTS_PER_MINUTE`, padrão 20) e o restante de `/api/**` usa `RATE_LIMIT_REQUESTS_PER_MINUTE` (padrão 60). Acima do limite: `429` com `Retry-After`. Os contadores ficam em memória **por instância**: com N réplicas o limite efetivo é N vezes maior (para limite global seria preciso um contador compartilhado, ex.: Bucket4j + Redis).
 - **Deploy atrás de proxy:** com `FORWARD_HEADERS_STRATEGY=none` (padrão) o IP vem da conexão, então atrás de um proxy/load balancer todos os clientes dividiriam o IP do proxy e o mesmo limite. Nesse caso use `native` ou `framework`, **mas só** se o proxy sobrescrever o `X-Forwarded-For` recebido do cliente; caso contrário o cliente forja o header e escapa do limite.
+- **Saída segura para o front:** `urlDetran` e `urlServico` passam pelo `UrlUtils` e só saem como URL `http`/`https` absoluta (qualquer outra coisa, como `javascript:` ou `data:`, vira `null`), então podem ir direto num `href`. Os textos longos (`passoAPasso`, `documentosNecessarios`, `observacoes`, `descricao`...) são texto puro: o front deve exibi-los como texto, nunca com `v-html`/`dangerouslySetInnerHTML`/`innerHTML`.
 - **N+1:** os relacionamentos são `LAZY` e carregados com `@EntityGraph`. `open-in-view` fica desligado.
 - **Placa:** normalizada (maiúscula, sem hífen) e validada nos formatos ABC1234 e ABC1D23.
 - **Dados pessoais:** nenhum dado do proprietário (nome, CPF/CNPJ) sai pela API. Renavam e chassi também não aparecem nas respostas.
