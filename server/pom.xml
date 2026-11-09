@@ -53,6 +53,12 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
+        <!-- Health check (/actuator/health) usado pelo Render; so o endpoint de health fica exposto -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Seguranca -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

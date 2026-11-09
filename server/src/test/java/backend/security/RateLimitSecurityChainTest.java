@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,6 +49,8 @@ class RateLimitSecurityChainTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(header().string("Access-Control-Allow-Origin", ORIGEM))
+                // Sem o expose, o JavaScript do front nao consegue ler o Retry-After
+                .andExpect(header().string("Access-Control-Expose-Headers", containsString("Retry-After")))
                 .andExpect(jsonPath("$.status").value(429));
     }
 }

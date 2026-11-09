@@ -56,3 +56,16 @@ jobs:
           name: relatorios-surefire
           path: server/target/surefire-reports/
           retention-days: 7
+
+  # Mesma imagem que o Render constroi: um Dockerfile quebrado aparece aqui, no PR, e nao no deploy
+  imagem:
+    name: Imagem Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v7
+
+      - name: Construir a imagem
+        run: docker build -t consulta-api:ci server

@@ -1,0 +1,2 @@
+# Converte DATABASE_URL (formato do Render/Heroku) quando DB_URL nao esta definida
+org.springframework.boot.env.EnvironmentPostProcessor=backend.config.DatabaseUrlEnvironmentPostProcessor

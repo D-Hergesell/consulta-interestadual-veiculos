@@ -1,0 +1,15 @@
+# Credenciais nunca entram na imagem
+.env
+.env.*
+*.env
+
+# Build e IDE
+target/
+.idea/
+*.iml
+.vscode/
+
+# Nao sao necessarios dentro da imagem
+Dockerfile
+.dockerignore
+HELP.md

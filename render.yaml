@@ -1,0 +1,38 @@
+# Blueprint do Render para o backend (server/). No painel: New > Blueprint > escolher este repositorio.
+# Variaveis com "sync: false" sao pedidas no painel na criacao e NUNCA ficam neste arquivo.
+# Referencia: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: consulta-interestadual-veiculos-api
+    runtime: docker
+    # So muda de deploy quando algo em server/ muda; caminhos abaixo sao relativos a server/
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # O Render nao tem regiao na America do Sul; virginia e a mais proxima do Neon (sa-east-1, Sao Paulo)
+    region: virginia
+    plan: free
+    branch: main
+    # readiness = aplicacao pronta; nao depende do banco, evita reinicios em loop se o banco oscilar
+    healthCheckPath: /actuator/health/readiness
+    envVars:
+      # ---- Banco: escolha UMA das opcoes ----
+      # Opcao A (Neon, atual): as tres abaixo, DB_URL no formato jdbc:postgresql://<host>/<banco>?sslmode=require
+      # Opcao B (Postgres do Render): apague as tres e crie DATABASE_URL com a "Internal Database URL" do banco
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+
+      # Dominio do front (ex.: https://consulta-veiculos.vercel.app); varios separados por virgula
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+      # Swagger desligado em producao
+      - key: SWAGGER_ENABLED
+        value: "false"
+      # Mantem "none": o IP do rate limit vem de RATE_LIMIT_IP_HEADER (ver README, secao Deploy no Render)
+      - key: FORWARD_HEADERS_STRATEGY
+        value: none

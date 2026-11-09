@@ -44,6 +44,9 @@ public class SecurityConfig {
 
     private static final String[] DOCUMENTACAO = {"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"};
 
+    /** Health check do Actuator, usado pelo Render. So o health e exposto (application.properties), sem detalhes. */
+    private static final String[] HEALTH = {"/actuator/health", "/actuator/health/**"};
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, RateLimitProperties rateLimit,
                                                    ObjectMapper objectMapper) throws Exception {
@@ -65,6 +68,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, ROTAS_PUBLICAS.toArray(String[]::new)).permitAll()
                         .requestMatchers(HttpMethod.GET, DOCUMENTACAO).permitAll()
+                        .requestMatchers(HttpMethod.GET, HEALTH).permitAll()
                         // Pagina de erro interna do Spring: sem isso, erros viram 401/403 em vez do status real
                         .requestMatchers("/error").permitAll()
                         .anyRequest().denyAll());

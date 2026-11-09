@@ -6,19 +6,24 @@ Backend: Spring Boot 3.5 (Java 21) + Spring Data JPA + PostgreSQL (Neon) + Sprin
 consulta-interestadual-veiculos/
 ├── .github/
 │   ├── dependabot.yml                          # PRs semanais de atualização (Maven e actions)
-│   └── workflows/backend-ci.yml                # roda os testes do backend a cada push/PR
+│   └── workflows/backend-ci.yml                # testes + build da imagem Docker a cada push/PR
 ├── client/
+├── docs/
+│   └── API.md                                  # guia da API para o frontend (rotas, exemplos, erros)
 ├── server/
 │   ├── .mvn/wrapper/maven-wrapper.properties
 │   ├── mvnw / mvnw.cmd                         # Maven Wrapper (não precisa de Maven instalado)
 │   ├── pom.xml
 │   ├── .env.example                            # modelo das variáveis; copiar para server/.env (não commitado)
+│   ├── Dockerfile                              # imagem usada no Render (build em 2 estágios, usuário sem root)
+│   ├── .dockerignore                           # mantém o .env fora da imagem
 │   └── src/
 │       ├── main/
 │       │   ├── java/
 │       │   │   └── backend/
 │       │   │       ├── config/
 │       │   │       │   ├── CorsConfig.java
+│       │   │       │   ├── DatabaseUrlEnvironmentPostProcessor.java   # aceita DATABASE_URL do Render
 │       │   │       │   ├── OpenApiConfig.java
 │       │   │       │   └── SecurityConfig.java
 │       │   │       ├── controller/
@@ -86,10 +91,14 @@ consulta-interestadual-veiculos/
 │       │   │       └── ConsultaInterestadualVeiculos.java
 │       │   └── resources/
 │       │       ├── application.properties
+│       │       ├── META-INF/spring.factories       # registra o DatabaseUrlEnvironmentPostProcessor
 │       │       └── db/migration/               # scripts Flyway (vazio: banco imutável por enquanto)
 │       └── test/
 │           └── java/backend/
-│               ├── config/SecurityRotasPublicasTest.java   # trava rota sem decisão em ROTAS_PUBLICAS
+│               ├── config/
+│               │   ├── CorsConfigTest.java
+│               │   ├── DatabaseUrlEnvironmentPostProcessorTest.java
+│               │   └── SecurityRotasPublicasTest.java   # trava rota sem decisão em ROTAS_PUBLICAS
 │               ├── controller/
 │               │   ├── TransferenciaControllerTest.java
 │               │   ├── VeiculoControllerTest.java
@@ -104,6 +113,7 @@ consulta-interestadual-veiculos/
 │                   ├── PlacaUtilsTest.java
 │                   ├── RenavamUtilsTest.java
 │                   └── UrlUtilsTest.java
+├── render.yaml                                 # Blueprint do Render (serviço web Docker)
 └── Estrutura_de_pastas.md
 ```
 
@@ -128,8 +138,34 @@ consulta-interestadual-veiculos/
 
 ## Integração contínua
 
-- **Backend CI** (`.github/workflows/backend-ci.yml`): a cada push na `main` e em todo pull request que mexa em `server/`, o GitHub instala o Java 21 e roda `./mvnw test`. O resultado aparece como ✅/❌ no commit e no PR; se falhar, os relatórios dos testes ficam disponíveis por 7 dias na aba **Actions** (artefato `relatorios-surefire`). Também dá para rodar manualmente pela aba Actions.
+- **Backend CI** (`.github/workflows/backend-ci.yml`): a cada push na `main` e em todo pull request que mexa em `server/`, o GitHub instala o Java 21 e roda `./mvnw test` e, em paralelo, constrói a imagem Docker (a mesma do Render). O resultado aparece como ✅/❌ no commit e no PR; se falhar, os relatórios dos testes ficam disponíveis por 7 dias na aba **Actions** (artefato `relatorios-surefire`). Também dá para rodar manualmente pela aba Actions.
 - **Dependabot** (`.github/dependabot.yml`): toda segunda-feira abre PRs atualizando as dependências Maven (Spring agrupado num PR só) e as versões das actions. Cada PR passa pela CI antes do merge. Saltos de versão principal do Spring Boot e do springdoc (ex.: 3 → 4) são ignorados de propósito: exigem migração e ficam para uma tarefa própria.
+
+## Frontend
+
+O contrato da API para quem for construir o `client/` está em [docs/API.md](docs/API.md): rotas, exemplos de resposta, valores possíveis, erros e como enviar o RENAVAM. Do lado do backend, a conexão com o front depende só de `CORS_ALLOWED_ORIGINS` (domínios do front, aceita curinga como `https://*.vercel.app`). O backend já expõe o `Retry-After` para o front ler no `429`.
+
+## Deploy no Render
+
+O Render não tem runtime nativo de Java, então o backend sobe como **Docker** (`server/Dockerfile`), descrito no Blueprint `render.yaml`.
+
+1. No Render: **New → Blueprint** e escolha este repositório. Ele cria o serviço web `consulta-interestadual-veiculos-api` (Docker, região Virginia, plano free) e pede as variáveis marcadas com `sync: false`.
+2. **Banco**, escolha uma opção:
+   - **Neon (atual):** preencha `DB_URL` (`jdbc:postgresql://<host>/<banco>?sslmode=require`), `DB_USERNAME` e `DB_PASSWORD`.
+   - **Postgres do Render:** apague as três e crie `DATABASE_URL` com a **Internal Database URL** do banco (formato `postgres://...`). O backend converte sozinho na inicialização.
+3. `CORS_ALLOWED_ORIGINS`: o domínio do front (pode ficar `http://localhost:5173` até o front existir).
+4. O health check é `GET /actuator/health/readiness`; o deploy só troca de versão quando a nova instância responde `200`.
+5. **IP do cliente para o rate limit** (fazer no primeiro deploy):
+   1. Adicione temporariamente `LOGGING_LEVEL_BACKEND_SECURITY=DEBUG`.
+   2. Acesse qualquer rota `/api/...` e veja nos logs do Render a linha `Origem do IP: remoteAddr=... | X-Forwarded-For=... | CF-Connecting-IP=... | True-Client-IP=...`.
+   3. Se `remoteAddr` for um IP interno (ex.: `10.x`) e `CF-Connecting-IP` (ou `True-Client-IP`) trouxer o seu IP público, defina `RATE_LIMIT_IP_HEADER` com o nome desse header. Confirme mandando você mesmo um `CF-Connecting-IP: 1.2.3.4` (ex.: `curl -H "CF-Connecting-IP: 1.2.3.4" ...`): se o log continuar mostrando o seu IP real, o proxy sobrescreve o header e ele é confiável; se mostrar `1.2.3.4`, **não use** esse header.
+   4. Remova o `LOGGING_LEVEL_BACKEND_SECURITY`.
+6. Mantenha **uma instância** (o rate limit é em memória, por instância).
+
+Observações:
+- O Neon está em São Paulo (`sa-east-1`) e o Render não tem região na América do Sul; Virginia é a mais próxima (~120 ms por ida e volta ao banco). Um Postgres do Render na mesma região elimina essa latência.
+- No plano free o serviço hiberna após um período sem acesso; a primeira requisição depois disso pode levar cerca de 1 minuto.
+- Rodar a imagem localmente: `docker build -t consulta-api server` e `docker run --rm -p 8080:8080 --env-file server/.env consulta-api`.
 
 ## Decisões
 
@@ -137,7 +173,7 @@ consulta-interestadual-veiculos/
 - **Credenciais:** ficam só em variáveis de ambiente ou em `server/.env`, que é ignorado pelo git.
 - **Segurança:** a API é pública e somente leitura. Só são liberadas as rotas GET listadas em `SecurityConfig.ROTAS_PUBLICAS`; todo o resto é negado (`403`), inclusive GET em rota que não está na lista. Endpoint novo precisa entrar na lista de propósito: o `SecurityRotasPublicasTest` falha se existir handler sem essa decisão (ou entrada na lista sem handler). Sem sessão (stateless), sem login padrão do Spring, CORS restrito às origens de `CORS_ALLOWED_ORIGINS` e headers de segurança ativos (HSTS, X-Frame-Options, nosniff, Referrer-Policy). Os erros não expõem stacktrace nem mensagens internas.
 - **Rate limit:** janela fixa de 1 minuto por cliente, contado como IPv4 exato ou prefixo `/64` do IPv6 (um provedor entrega um /64 inteiro por assinante). `/api/veiculos/**` tem contador próprio (`RATE_LIMIT_PLACA_REQUESTS_PER_MINUTE`, padrão 20) e o restante de `/api/**` usa `RATE_LIMIT_REQUESTS_PER_MINUTE` (padrão 60). Acima do limite: `429` com `Retry-After`. Os contadores ficam em memória **por instância**: com N réplicas o limite efetivo é N vezes maior (para limite global seria preciso um contador compartilhado, ex.: Bucket4j + Redis).
-- **Deploy atrás de proxy:** com `FORWARD_HEADERS_STRATEGY=none` (padrão) o IP vem da conexão, então atrás de um proxy/load balancer todos os clientes dividiriam o IP do proxy e o mesmo limite. Nesse caso use `native` ou `framework`, **mas só** se o proxy sobrescrever o `X-Forwarded-For` recebido do cliente; caso contrário o cliente forja o header e escapa do limite.
+- **IP do cliente atrás de proxy:** por padrão o rate limit usa o IP da conexão. Atrás de um proxy (Render) todos os clientes chegariam com o IP do proxy e dividiriam o mesmo limite; por isso `RATE_LIMIT_IP_HEADER` aponta um header que o proxy **sobrescreve** com o IP real (ver Deploy no Render). `FORWARD_HEADERS_STRATEGY` fica `none`: no Render o proxy só acrescenta ao `X-Forwarded-For` enviado pelo cliente, que poderia forjar o próprio IP.
 - **Saída segura para o front:** `urlDetran` e `urlServico` passam pelo `UrlUtils` e só saem como URL `http`/`https` absoluta (qualquer outra coisa, como `javascript:` ou `data:`, vira `null`), então podem ir direto num `href`. Os textos longos (`passoAPasso`, `documentosNecessarios`, `observacoes`, `descricao`...) são texto puro: o front deve exibi-los como texto, nunca com `v-html`/`dangerouslySetInnerHTML`/`innerHTML`.
 - **N+1:** os relacionamentos são `LAZY` e carregados com `@EntityGraph`. `open-in-view` fica desligado.
 - **Placa:** normalizada (maiúscula, sem hífen) e validada nos formatos ABC1234 e ABC1D23.

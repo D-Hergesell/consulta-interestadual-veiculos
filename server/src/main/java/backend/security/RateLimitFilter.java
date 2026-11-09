@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 
 /**
  * Limita requisicoes em /api/** por cliente, em janelas fixas de 1 minuto. Acima do limite responde
@@ -43,6 +44,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final long JANELA_MS = Duration.ofMinutes(1).toMillis();
     private static final String PREFIXO_API = "/api/";
     private static final String PREFIXO_PLACA = "/api/veiculos/";
+    /** So digitos, hexa, ':' e '.': aceita IPv4/IPv6 e nunca um nome de host (que dispararia DNS). */
+    private static final Pattern PARECE_IP = Pattern.compile("[0-9A-Fa-f:.]{2,45}");
 
     private final RateLimitProperties properties;
     private final ObjectMapper objectMapper;
@@ -69,7 +72,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         boolean rotaDePlaca = caminho(request).startsWith(PREFIXO_PLACA);
         int limite = rotaDePlaca ? properties.placaRequestsPerMinute() : properties.requestsPerMinute();
-        String cliente = chaveDoCliente(request.getRemoteAddr());
+        String cliente = chaveDoCliente(ipDoCliente(request));
         String chave = (rotaDePlaca ? "placa|" : "api|") + cliente;
         int total = janela.contadores().computeIfAbsent(chave, c -> new AtomicInteger()).incrementAndGet();
 
@@ -87,6 +90,34 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static String caminho(HttpServletRequest request) {
         return request.getRequestURI().substring(request.getContextPath().length());
+    }
+
+    /**
+     * IP usado no limite. Padrao: o IP da conexao. Com app.rate-limit.ip-header configurado (ex.:
+     * CF-Connecting-IP atras do proxy do Render), usa o primeiro valor desse header, desde que seja um
+     * IP valido; se o header faltar ou vier lixo, volta para o IP da conexao.
+     * <p>
+     * So configure um header que o proxy SOBRESCREVE. Header que o cliente consegue enviar e o proxy so
+     * repassa (como o X-Forwarded-For no Render) deixa o atacante escolher o proprio IP e escapar do limite.
+     */
+    String ipDoCliente(HttpServletRequest request) {
+        String remoto = request.getRemoteAddr();
+        String nomeHeader = properties.ipHeader();
+        if (log.isDebugEnabled()) {
+            // Diagnostico para escolher o header no deploy: ligue com LOGGING_LEVEL_BACKEND_SECURITY=DEBUG
+            log.debug("Origem do IP: remoteAddr={} | X-Forwarded-For={} | CF-Connecting-IP={} | True-Client-IP={}",
+                    remoto, request.getHeader("X-Forwarded-For"), request.getHeader("CF-Connecting-IP"),
+                    request.getHeader("True-Client-IP"));
+        }
+        if (nomeHeader == null || nomeHeader.isBlank()) {
+            return remoto;
+        }
+        String valor = request.getHeader(nomeHeader);
+        if (valor == null) {
+            return remoto;
+        }
+        String primeiro = valor.split(",", 2)[0].strip();
+        return PARECE_IP.matcher(primeiro).matches() ? primeiro : remoto;
     }
 
     /**

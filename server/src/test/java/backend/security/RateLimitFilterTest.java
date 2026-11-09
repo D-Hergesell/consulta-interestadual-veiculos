@@ -130,7 +130,62 @@ class RateLimitFilterTest {
     }
 
     private RateLimitFilter filtro(boolean habilitado) {
-        return new RateLimitFilter(new RateLimitProperties(habilitado, LIMITE, LIMITE_PLACA), objectMapper, relogio);
+        return new RateLimitFilter(new RateLimitProperties(habilitado, LIMITE, LIMITE_PLACA, null), objectMapper, relogio);
+    }
+
+    private RateLimitFilter filtroComHeaderDeIp(String header) {
+        return new RateLimitFilter(new RateLimitProperties(true, LIMITE, LIMITE_PLACA, header), objectMapper, relogio);
+    }
+
+    @Test
+    void comHeaderDeIpConfiguradoContaPeloIpDoHeaderENaoPeloProxy() throws Exception {
+        RateLimitFilter filtro = filtroComHeaderDeIp("CF-Connecting-IP");
+        // Todas as requisicoes chegam do mesmo proxy (10.0.0.1), mas de clientes diferentes
+        executar(filtro, requisicao("/api/estados", "10.0.0.1", "CF-Connecting-IP", "200.1.1.1"));
+        executar(filtro, requisicao("/api/estados", "10.0.0.1", "CF-Connecting-IP", "200.1.1.1"));
+        assertThat(executar(filtro, requisicao("/api/estados", "10.0.0.1", "CF-Connecting-IP", "200.1.1.1"))
+                .getStatus()).isEqualTo(429);
+
+        assertThat(executar(filtro, requisicao("/api/estados", "10.0.0.1", "CF-Connecting-IP", "200.2.2.2"))
+                .getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void headerDeIpUsaSoOPrimeiroValorDaLista() {
+        RateLimitFilter filtro = filtroComHeaderDeIp("X-Client-IP");
+        assertThat(filtro.ipDoCliente(requisicao("/api/estados", "10.0.0.1", "X-Client-IP", " 200.1.1.1 , 10.9.9.9")))
+                .isEqualTo("200.1.1.1");
+    }
+
+    @Test
+    void headerDeIpAusenteOuInvalidoVoltaParaOIpDaConexao() {
+        RateLimitFilter filtro = filtroComHeaderDeIp("CF-Connecting-IP");
+        assertThat(filtro.ipDoCliente(requisicao("/api/estados", "10.0.0.1"))).isEqualTo("10.0.0.1");
+        assertThat(filtro.ipDoCliente(requisicao("/api/estados", "10.0.0.1", "CF-Connecting-IP", "evil.example.com")))
+                .isEqualTo("10.0.0.1");
+        assertThat(filtro.ipDoCliente(requisicao("/api/estados", "10.0.0.1", "CF-Connecting-IP", "")))
+                .isEqualTo("10.0.0.1");
+    }
+
+    @Test
+    void semHeaderConfiguradoIgnoraHeadersDeIpDoCliente() {
+        // Padrao seguro: um X-Forwarded-For enviado pelo proprio cliente nao muda nada
+        RateLimitFilter filtro = filtro(true);
+        assertThat(filtro.ipDoCliente(requisicao("/api/estados", "10.0.0.1", "X-Forwarded-For", "1.2.3.4")))
+                .isEqualTo("10.0.0.1");
+    }
+
+    private static MockHttpServletResponse executar(RateLimitFilter filtro, MockHttpServletRequest request)
+            throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filtro.doFilter(request, response, new MockFilterChain());
+        return response;
+    }
+
+    private static MockHttpServletRequest requisicao(String uri, String ip, String header, String valor) {
+        MockHttpServletRequest request = requisicao(uri, ip);
+        request.addHeader(header, valor);
+        return request;
     }
 
     private static MockHttpServletResponse executar(RateLimitFilter filtro, String uri, String ip) throws Exception {
