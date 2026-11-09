@@ -1,18 +1,26 @@
 # Blueprint do Render para o backend (server/). No painel: New > Blueprint > escolher este repositorio.
-# Variaveis com "sync: false" sao pedidas no painel na criacao e NUNCA ficam neste arquivo.
+# Variaveis com "sync: false" sao pedidas no painel SO na criacao e NUNCA ficam neste arquivo.
+# Depois de criado, altere essas variaveis direto no painel (Environment): o Render as ignora em syncs do Blueprint.
 # Referencia: https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: consulta-interestadual-veiculos-api
     runtime: docker
-    # So muda de deploy quando algo em server/ muda; caminhos abaixo sao relativos a server/
-    rootDir: server
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    # O Render nao tem regiao na America do Sul; virginia e a mais proxima do Neon (sa-east-1, Sao Paulo)
+    # Caminhos a partir da raiz do repositorio. Sem rootDir de proposito: a documentacao do Render
+    # diverge sobre dockerfilePath/dockerContext serem relativos ao rootDir ou a raiz do repo.
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    # So faz deploy automatico quando algo em server/ muda (caminhos sempre relativos a raiz do repo)
+    buildFilter:
+      paths:
+        - server/**
+    # O Render nao tem regiao na America do Sul; virginia e a mais proxima do Neon (sa-east-1, Sao Paulo).
+    # Nao da para mudar a regiao depois de criar o servico.
     region: virginia
     plan: free
     branch: main
+    # Deploy so depois que a CI (GitHub Actions) passar no commit da main
+    autoDeployTrigger: checksPass
     # readiness = aplicacao pronta; nao depende do banco, evita reinicios em loop se o banco oscilar
     healthCheckPath: /actuator/health/readiness
     envVars:
