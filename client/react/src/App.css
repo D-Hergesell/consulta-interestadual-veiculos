@@ -1,0 +1,168 @@
+/* client/react/src/App.css */
+
+/* Força modo claro (evita o tema escuro do sistema) */
+:root {
+  color-scheme: light;
+
+  /* Cores do Detran-SC (vindas do site) */
+  --verde: #336633;
+  --verde-claro: #9bbf1f;
+  --vermelho: #c4000b;
+  --vermelho-escuro: #9e0009;
+  --azul: #1f4e8c;
+  --texto: #333333;
+  --cinza: #54595f;
+  --borda: #e0e0e0;
+  --fundo: #f5f6f7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* Layout */
+.container {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+h1 {
+  font-family: "Roboto Slab", Georgia, serif;
+  font-weight: 500;
+  font-size: 1.7rem;
+  color: var(--verde);
+  margin: 0 0 20px;
+  padding-bottom: 10px;
+  border-bottom: 3px solid var(--verde-claro);
+}
+
+h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--verde);
+  margin: 0 0 12px;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cinza);
+  margin: 18px 0 8px;
+  padding-left: 10px;
+  border-left: 4px solid var(--azul);
+}
+
+p {
+  margin: 6px 0;
+  color: var(--texto);
+}
+
+a {
+  color: var(--azul);
+}
+
+/* Cartões de cada seção */
+section,
+.resultado {
+  background: #ffffff;
+  border: 1px solid var(--borda);
+  border-top: 4px solid var(--azul);
+  border-radius: 6px;
+  padding: 20px;
+  margin-top: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Linha de campos e botões */
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+input,
+select {
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
+  border: 1px solid #b0b0b0;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--texto);
+  background: #ffffff;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--verde-claro);
+  border-color: var(--verde);
+}
+
+button {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 4px;
+  background: var(--vermelho);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--vermelho-escuro);
+}
+
+button:disabled {
+  background: #b0b0b0;
+  cursor: not-allowed;
+}
+
+/* Mensagens */
+.erro {
+  background: #fdecec;
+  color: #8a0009;
+  border-left: 4px solid var(--vermelho);
+  padding: 12px;
+  margin-top: 12px;
+  border-radius: 4px;
+}
+
+/* Textos longos (passo a passo, documentos) */
+.texto {
+  white-space: pre-line;
+  line-height: 1.6;
+}
+
+/* Item de serviço do Detran */
+.servico {
+  border-top: 1px solid var(--borda);
+  padding: 12px 0;
+}
+
+/* Celular: campos e botões ocupam a largura toda */
+@media (max-width: 600px) {
+  .container {
+    padding: 16px 12px 32px;
+  }
+
+  input,
+  select,
+  button {
+    width: 100%;
+  }
+}
