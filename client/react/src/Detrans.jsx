@@ -1,26 +1,5 @@
-// client/react/src/Detrans.jsx
-import { useEffect, useState } from "react";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
-
-// Contatos usados quando a API não traz telefone/WhatsApp (valor null).
-// Só entram aqui números confirmados em fonte oficial ou em notícia.
-// "não informado" = ainda não confirmado.
-const CONTATOS_FIXOS = {
-    SC: {
-        telefone: "(48) 3664-1800",
-        whatsapp: "(48) 3664-1800",
-        email: "centraldeinformacoes@detran.sc.gov.br",
-    },
-    PR: {
-        telefone: "0800 643 7373",
-        whatsapp: "Projeto Copiloto (seg. a sex., 8h às 16h)",
-    },
-    RJ: {
-        telefone: "(21) 3460-4040",
-        whatsapp: "(21) 3460-4040",
-    },
-};
+import { useEffect, useRef, useState } from "react";
+import { consultarApi } from "./api";
 
 const formatarReais = (valor) =>
     valor == null
@@ -32,94 +11,105 @@ export default function Detrans() {
     const [ufSelecionada, setUfSelecionada] = useState("");
     const [servicos, setServicos] = useState([]);
     const [erro, setErro] = useState("");
-    const [carregando, setCarregando] = useState(false);
+    const [carregandoEstados, setCarregandoEstados] = useState(true);
+    const [carregandoServicos, setCarregandoServicos] = useState(false);
+    const requisicaoAtual = useRef(0);
 
-    // Carrega a lista de estados ao abrir a tela
+    // GET /api/estados
     useEffect(() => {
-        fetch(`${API}/api/estados`)
-            .then((resp) => {
-                if (!resp.ok) throw new Error("Não foi possível carregar os estados.");
-                return resp.json();
-            })
+        const controller = new AbortController();
+        consultarApi("/api/estados", { contexto: "estado", signal: controller.signal })
             .then((dados) => setEstados(dados))
-            .catch((err) => setErro(err.message));
+            .catch((err) => {
+                if (err.name !== "AbortError") setErro(err.message);
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setCarregandoEstados(false);
+            });
+        return () => controller.abort();
     }, []);
 
-    // Carrega os serviços sempre que uma UF é escolhida
+    // GET /api/estados/{uf}/servicos
     async function selecionarUf(uf) {
         setUfSelecionada(uf);
         setServicos([]);
         setErro("");
-        if (!uf) return;
-
-        setCarregando(true);
+        const id = ++requisicaoAtual.current;
+        if (!uf) {
+            setCarregandoServicos(false);
+            return;
+        }
+        setCarregandoServicos(true);
         try {
-            const resp = await fetch(`${API}/api/estados/${uf}/servicos`);
-            if (!resp.ok) throw new Error("Não foi possível carregar os serviços.");
-            setServicos(await resp.json());
+            const dados = await consultarApi(`/api/estados/${uf}/servicos`, { contexto: "estado" });
+            if (id === requisicaoAtual.current) setServicos(dados);
         } catch (err) {
-            setErro(err.message);
+            if (id === requisicaoAtual.current) setErro(err.message);
         } finally {
-            setCarregando(false);
+            if (id === requisicaoAtual.current) setCarregandoServicos(false);
         }
     }
 
-    const estadoAtual = estados.find((e) => e.uf === ufSelecionada);
-    const fixo = CONTATOS_FIXOS[ufSelecionada] ?? {};
-
-    // Usa o dado da API; se vier null, usa o contato fixo
-    const telefone = estadoAtual?.telefone ?? fixo.telefone ?? "não informado";
-    const whatsapp = estadoAtual?.whatsapp ?? fixo.whatsapp ?? "não informado";
-    const email = fixo.email;
+    const estado = estados.find((item) => item.uf === ufSelecionada);
 
     return (
-        <section className="container">
-            <h2>Detrans por estado</h2>
+        <section className="container" aria-labelledby="detrans-titulo">
+            <h2 id="detrans-titulo">Detrans por estado</h2>
+            <p className="helper-text">Selecione uma UF para consultar os contatos e serviços disponíveis.</p>
+            <div className="field" style={{ marginTop: 15 }}>
+                <label htmlFor="estado-detran">Estado</label>
+                <select
+                    id="estado-detran"
+                    value={ufSelecionada}
+                    onChange={(e) => selecionarUf(e.target.value)}
+                    disabled={carregandoEstados}
+                >
+                    <option value="">{carregandoEstados ? "Carregando estados..." : "Escolha um estado"}</option>
+                    {estados.map((item) => (
+                        <option key={item.uf} value={item.uf}>
+                            {item.uf} - {item.nome}
+                        </option>
+                    ))}
+                </select>
+            </div>
 
-            <select value={ufSelecionada} onChange={(e) => selecionarUf(e.target.value)}>
-                <option value="">Escolha um estado</option>
-                {estados.map((e) => (
-                    <option key={e.uf} value={e.uf}>
-                        {e.uf} - {e.nome}
-                    </option>
-                ))}
-            </select>
-
-            {erro && <p className="erro">{erro}</p>}
-
-            {estadoAtual && (
-                <div className="resultado">
-                    <h3>{estadoAtual.siglaOrgao ?? "Detran"}</h3>
+            {erro && <p className="erro" role="alert">{erro}</p>}
+            {estado && (
+                <div className="resultado" aria-live="polite">
+                    <h3>{estado.siglaOrgao ?? "Detran"} — {estado.nome}</h3>
                     <p>
                         <strong>Site:</strong>{" "}
-                        {estadoAtual.urlDetran ? (
-                            <a href={estadoAtual.urlDetran} target="_blank" rel="noreferrer">
-                                {estadoAtual.urlDetran}
+                        {estado.urlDetran ? (
+                            <a href={estado.urlDetran} target="_blank" rel="noopener noreferrer">
+                                Acessar site oficial (link externo)
                             </a>
-                        ) : (
-                            "não informado"
-                        )}
+                        ) : "não informado"}
                     </p>
-                    <p><strong>Telefone:</strong> {telefone}</p>
-                    <p><strong>WhatsApp:</strong> {whatsapp}</p>
-                    {email && <p><strong>E-mail geral:</strong> {email}</p>}
+                    <p><strong>Telefone:</strong> {estado.telefone ?? "não informado"}</p>
+                    <p><strong>WhatsApp:</strong> {estado.whatsapp ?? "não informado"}</p>
 
-                    <h3>Serviços</h3>
-                    {carregando && <p>Carregando serviços...</p>}
-                    {!carregando && servicos.length === 0 && <p>Nenhum serviço cadastrado.</p>}
-                    {servicos.map((s) => (
-                        <div key={s.servico.id} className="servico">
-                            <strong>{s.servico.nome}</strong>
-                            <p>{s.servico.descricao}</p>
+                    <h3>Serviços disponíveis</h3>
+                    {carregandoServicos ? <p>Carregando serviços...</p> : null}
+                    {!carregandoServicos && servicos.length === 0 && !erro && (
+                        <p>Nenhum serviço cadastrado para essa UF.</p>
+                    )}
+                    {!carregandoServicos && servicos.map((item) => (
+                        <div key={item.servico.id} className="servico">
+                            <strong>{item.servico.nome}</strong>
+                            <p className="texto">{item.servico.descricao ?? "Descrição não informada"}</p>
                             <p>
-                                <strong>Taxa:</strong> {formatarReais(s.taxaEstimada)} |{" "}
-                                <strong>Prazo:</strong> {s.prazoDias ? `${s.prazoDias} dias` : "não informado"}
+                                <strong>Taxa estimada:</strong> {formatarReais(item.taxaEstimada)} |{" "}
+                                <strong>Prazo:</strong> {item.prazoDias == null ? "não informado" : `${item.prazoDias} dias`}
                             </p>
-                            <p><strong>Online:</strong> {s.servico.disponivelOnline ? "Sim" : "Não"}</p>
-                            {s.urlServico && (
-                                <a href={s.urlServico} target="_blank" rel="noreferrer">Acessar serviço</a>
+                            <p><strong>Disponível online:</strong> {item.servico.disponivelOnline ? "Sim" : "Não"}</p>
+                            {item.urlServico && (
+                                <p>
+                                    <a href={item.urlServico} target="_blank" rel="noopener noreferrer">
+                                        Acessar serviço (link externo)
+                                    </a>
+                                </p>
                             )}
-                            {s.observacoes && <p className="texto">{s.observacoes}</p>}
+                            {item.observacoes && <p className="texto">{item.observacoes}</p>}
                         </div>
                     ))}
                 </div>
